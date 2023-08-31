@@ -21,6 +21,6 @@ FROM gcr.io/distroless/cc
 
 WORKDIR /app
 
-COPY --from=build /app/target/release/x86_64-unknown-linux-musl/uptime uptime
+COPY --from=build /app/target/release/uptime uptime
 
 CMD ["/app/uptime"]

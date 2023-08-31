@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Uptime</title>
+</head>
+<body>
+    <main>
+        {% for check in status %}
+
+        <h2>{{ check.website }}</h2>
+        <p>Uptime: {{ check.ok_ratio }} ({{ check.count_ok }}/{{ check.total_requests }})</p>
+        {% if check.last_ok.is_some() %}
+        <p>Last OK: <span class="utc-timestamp">{{ check.last_ok.as_deref().unwrap() }}</span></p>
+        {% endif %}
+
+        {% endfor %}
+    </main>
+
+    <script>
+        const timestamps = document.querySelectorAll(".utc-timestamp");
+        timestamps.forEach((timestamp) => {
+            const date = new Date(timestamp.innerText);
+            const formatted  = new Intl.DateTimeFormat([], {
+                dateStyle: "short",
+                timeStyle: "short"
+            }).format(date);
+            timestamp.innerText = formatted;
+        })
+    </script>
+</body>
+</html>

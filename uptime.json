@@ -1,0 +1,13 @@
+{
+  "interval_seconds": 30,
+  "websites": [
+    {
+      "name": "nilstrieb.dev",
+      "url": "https://nilstrieb.dev"
+    },
+    {
+      "name": "localhost 1234",
+      "url": "http://localhost:1234"
+    }
+  ]
+}

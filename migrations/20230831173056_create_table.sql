@@ -1,0 +1,6 @@
+CREATE TABLE checks (
+    id INTEGER AUTO INCREMENT PRIMARY KEY,
+    request_time TIMESTAMP NOT NULL,
+    website VARCHAR NOT NULL,
+    result VARCHAR NOT NULL
+);

@@ -1,16 +1,16 @@
 use chrono::Utc;
-use eyre::{bail, Context, Result};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
+use tracing::info;
 
 use crate::config::WebsiteConfig;
 
 pub struct Client {
-    websites: Vec<WebsiteConfig>,
-    req: reqwest::Client,
+    pub websites: Vec<WebsiteConfig>,
+    pub req: reqwest::Client,
 }
 
 pub struct Results {
-    pub states: HashMap<String, CheckResult>,
+    pub states: BTreeMap<String, CheckResult>,
 }
 
 pub struct CheckResult {
@@ -18,13 +18,15 @@ pub struct CheckResult {
     pub state: CheckState,
 }
 
+#[derive(sqlx::Type)]
+#[sqlx(rename_all = "snake_case")]
 pub enum CheckState {
     Ok,
     NotOk,
 }
 
 pub async fn do_checks(client: &Client) -> Results {
-    let mut states = HashMap::new();
+    let mut states = BTreeMap::new();
     for website in &client.websites {
         let check_result = make_request(&client.req, website).await;
         states.insert(website.name.clone(), check_result);
@@ -33,9 +35,12 @@ pub async fn do_checks(client: &Client) -> Results {
     Results { states }
 }
 
+#[tracing::instrument(skip(client))]
 async fn make_request(client: &reqwest::Client, website: &WebsiteConfig) -> CheckResult {
     let time = Utc::now();
     let result = client.get(website.url.clone()).send().await;
+
+    info!(?result, ?website.url, "Made health request");
 
     match result {
         Ok(res) => CheckResult {
@@ -46,7 +51,7 @@ async fn make_request(client: &reqwest::Client, website: &WebsiteConfig) -> Chec
                 CheckState::NotOk
             },
         },
-        Err(err) => CheckResult {
+        Err(_) => CheckResult {
             time,
             state: CheckState::NotOk,
         },

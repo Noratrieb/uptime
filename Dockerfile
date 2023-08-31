@@ -17,7 +17,7 @@ RUN touch src/main.rs
 RUN cargo build --release
 
 ### RUN
-FROM gcr.io/distroless/cc
+FROM docker.io/library/debian:trixie-20230814-slim
 
 WORKDIR /app
 

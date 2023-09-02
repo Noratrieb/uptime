@@ -10,13 +10,32 @@
             font-family: Arial, Helvetica, sans-serif;
         }
 
+        .check-result-bar-container {
+            display: flex;
+            flex-direction: column;
+            width: 800px;
+        }
+
+        /* This is a bit hacky and ensures that the bar doesn't go through the right. */
+        @media only screen and (max-width: 810px) {
+            .check-result-bar-container {
+                width: 100%;
+            }
+        }
+
         .check-result-bar {
             display: flex;
         }
 
+        .check-result-bar-labels {
+            margin-top: 5px;
+            display: flex;
+            justify-content: space-between;
+        }
+
         .check-result {
             height: 10px;
-            width: 5px;
+            width: 100vw; /* It will be squashed. */
         }
 
         .check-result-red {
@@ -46,13 +65,21 @@
         <p>Last OK: <span class="utc-timestamp">{{ check.last_ok.as_deref().unwrap() }}</span></p>
         {% endif %}
 
-        <div class="check-result-bar">
-            {% for result in check.bar_classes %}
-            <div class="check-result {{ result.as_class() }}"></div>
-            {% endfor %}
+        <div class="check-result-bar-container">
+            <div class="check-result-bar">
+                {% for result in check.bar_info.elems %}
+                <div class="check-result {{ result.as_class() }}"></div>
+                {% endfor %}
+            </div>
+            {% if check.bar_info.first_time.is_some() && check.bar_info.last_time.is_some() %}
+            <div class="check-result-bar-labels">
+                <span class="utc-timestamp">{{ check.bar_info.first_time.unwrap().render_nicely() }}</span>
+                <span class="utc-timestamp">{{ check.bar_info.last_time.unwrap().render_nicely() }}</span>
+            </div>
+            {% endif %}
         </div>
 
-        {% endfor %} 
+        {% endfor %}
     </main>
 
     <script>

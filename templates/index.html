@@ -5,6 +5,36 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Uptime</title>
+    <style>
+        html {
+            font-family: Arial, Helvetica, sans-serif;
+        }
+
+        .check-result-bar {
+            display: flex;
+        }
+
+        .check-result {
+            height: 10px;
+            width: 5px;
+        }
+
+        .check-result-red {
+            background-color: red;
+        }
+
+        .check-result-orange {
+            background-color: orange;
+        }
+
+        .check-result-green {
+            background-color: green;
+        }
+
+        .check-result-unknown {
+            background-color: grey;
+        }
+    </style>
 </head>
 <body>
     <main>
@@ -16,7 +46,13 @@
         <p>Last OK: <span class="utc-timestamp">{{ check.last_ok.as_deref().unwrap() }}</span></p>
         {% endif %}
 
-        {% endfor %}
+        <div class="check-result-bar">
+            {% for result in check.bar_classes %}
+            <div class="check-result {{ result.as_class() }}"></div>
+            {% endfor %}
+        </div>
+
+        {% endfor %} 
     </main>
 
     <script>

@@ -7,6 +7,7 @@ use axum::{
     routing::get,
     Router,
 };
+use chrono::{DateTime, Utc};
 use eyre::{Context, Result};
 use http::StatusCode;
 use sqlx::{Pool, Sqlite};
@@ -58,14 +59,19 @@ fn compute_status(checks: Vec<Check>) -> Vec<WebsiteStatus> {
 
     websites
         .into_iter()
-        .map(|(website, checks)| {
+        .map(|(website, mut checks)| {
+            checks.sort_by_key(|check| check.0);
+
             let mut last_ok = None;
             let mut count_ok = 0;
 
+            const BAR_ELEMS: usize = 100;
+            let bar_classes = checks_to_classes(&checks, BAR_ELEMS);
+
             let len = checks.len();
             checks.into_iter().for_each(|(time, result)| {
-                last_ok = std::cmp::max(last_ok, Some(time));
                 if let CheckState::Ok = result {
+                    last_ok = std::cmp::max(last_ok, Some(time));
                     count_ok += 1;
                 }
             });
@@ -81,6 +87,84 @@ fn compute_status(checks: Vec<Check>) -> Vec<WebsiteStatus> {
                 ok_ratio,
                 count_ok,
                 total_requests: len,
+                bar_classes,
+            }
+        })
+        .collect()
+}
+
+enum BarClass {
+    Green,
+    Orange,
+    Red,
+    Unknown,
+}
+
+impl BarClass {
+    fn as_class(&self) -> &'static str {
+        match self {
+            Self::Green => "check-result-green",
+            Self::Orange => "check-result-orange",
+            Self::Red => "check-result-red",
+            Self::Unknown => "check-result-unknown",
+        }
+    }
+}
+
+/// Converts a list of (sorted by time) checks at arbitrary dates into a list of boxes for the
+/// frontend, in a fixed sensical timeline.
+/// We slice the time from the first check to the last check (maybe something like last check-30d
+/// in the future) into slices and aggregate all checks from these times into these slices.
+fn checks_to_classes(checks: &[(DateTime<Utc>, CheckState)], classes: usize) -> Vec<BarClass> {
+    assert_ne!(classes, 0);
+    let Some(first) = checks.first() else {
+        return vec![];
+    };
+    let last = checks.last().unwrap();
+
+    let mut bins = vec![vec![]; classes];
+
+    let first = first.0.timestamp_millis();
+    let last = last.0.timestamp_millis();
+
+    let last_rel = last - first;
+    assert!(last.is_positive(), "checks not ordered correctly");
+
+    for check in checks {
+        let time_rel = check.0.timestamp_millis() - first;
+        assert!(first.is_positive(), "checks not ordered correctly");
+
+        /*
+        5 bins:
+        |   |   |   |   |   |
+        0.0 0.2 0.4 0.6 0.8 1.0  division
+        0.0 1.0 2.0 3.0 4.0 5.0  after multiply
+        */
+
+        let bin = (time_rel as f64) / (last_rel as f64) * ((classes) as f64);
+        let bin = bin as usize; // flooring on purpose
+        let bin = if bin == classes { bin - 1 } else { bin };
+        bins[bin].push(check);
+    }
+
+    bins.iter()
+        .map(|checks| {
+            let ok = checks
+                .iter()
+                .filter(|check| check.1 == CheckState::Ok)
+                .count();
+            let all = checks.len();
+
+            if all == 0 {
+                BarClass::Unknown
+            } else if all == ok {
+                BarClass::Green
+            } else if ok == 0 {
+                BarClass::Red
+            } else if ok > 0 && ok < all {
+                BarClass::Orange
+            } else {
+                unreachable!("i dont think logic works like this")
             }
         })
         .collect()
@@ -92,6 +176,7 @@ struct WebsiteStatus {
     ok_ratio: String,
     total_requests: usize,
     count_ok: usize,
+    bar_classes: Vec<BarClass>,
 }
 
 #[derive(Template)]

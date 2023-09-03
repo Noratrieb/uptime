@@ -23,7 +23,7 @@ fn try_get_commit() -> eyre::Result<String> {
 
     let stdout = String::from_utf8(stdout)?;
 
-    Ok(stdout.trim().to_owned())
+    Ok(stdout.trim()[0..8].to_owned())
 }
 
 fn has_no_changes() -> eyre::Result<bool> {

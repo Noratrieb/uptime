@@ -51,7 +51,7 @@ async fn render_root(db: Arc<Pool<Sqlite>>) -> Result<String> {
 
     let status = compute_status(checks);
 
-    let html = RootTemplate { status }
+    let html = RootTemplate { status, version: crate::VERSION }
         .render()
         .wrap_err("error rendering template")?;
     Ok(html)
@@ -212,4 +212,5 @@ struct WebsiteStatus {
 #[template(path = "index.html")]
 struct RootTemplate {
     status: Vec<WebsiteStatus>,
+    version: &'static str,
 }

@@ -17,7 +17,8 @@ use client::Client;
 pub use config::{read_config, Config, WebsiteConfig};
 pub use web::axum_server;
 
-const USER_AGENT: &str = concat!("uptime/", env!("GIT_COMMIT"));
+const USER_AGENT: &str = concat!("github:Nilstrieb/uptime/", env!("GIT_COMMIT"));
+const VERSION: &str = env!("GIT_COMMIT");
 
 pub async fn check_timer(config: Config, db: Arc<Pool<Sqlite>>) -> Result<ⵑ> {
     let req_client = reqwest::Client::builder()

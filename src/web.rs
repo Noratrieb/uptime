@@ -46,7 +46,7 @@ async fn root(State(db): State<Arc<Pool<Sqlite>>>) -> Response {
         })
 }
 
-async fn render_root(db: Arc<Pool<Sqlite>>) -> Result<String> {
+pub async fn render_root(db: Arc<Pool<Sqlite>>) -> Result<String> {
     let checks = crate::db::get_checks(&db).await?;
 
     let status = compute_status(checks);

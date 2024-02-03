@@ -32,6 +32,10 @@ async fn main() -> eyre::Result<()> {
         .await
         .wrap_err("running migrations")?;
 
+    uptime::db::migrate_checks(&db, config.interval_seconds)
+        .await
+        .wrap_err("migrating old checks to series")?;
+
     info!("Started up.");
 
     let checker = uptime::check_timer(config, db.clone());

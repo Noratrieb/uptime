@@ -18,7 +18,7 @@ pub struct CheckResult {
     pub state: CheckState,
 }
 
-#[derive(Debug, PartialEq, Clone, sqlx::Type)]
+#[derive(Debug, PartialEq, Clone, Copy, sqlx::Type)]
 #[sqlx(rename_all = "snake_case")]
 pub enum CheckState {
     Ok,

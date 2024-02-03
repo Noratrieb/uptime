@@ -47,6 +47,10 @@ pub async fn init() -> Result<(Config, Arc<Pool<Sqlite>>)> {
         .await
         .wrap_err("running migrations")?;
 
+    db::migrate_checks(&db, config.interval_seconds)
+        .await
+        .wrap_err("migrating old checks to series")?;
+
     Ok((config, db))
 }
 
@@ -70,10 +74,6 @@ pub async fn check_timer(config: Config, db: Arc<Pool<Sqlite>>) -> Result<ⵑ> {
         info!("Running tick.");
 
         let results = client::do_checks(&client).await;
-
-        if let Err(err) = db::insert_results(&db, &results).await {
-            error!(?err);
-        }
 
         if let Err(err) = db::insert_results_series(&db, config.interval_seconds, &results).await {
             error!(?err);

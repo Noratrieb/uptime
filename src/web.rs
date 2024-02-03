@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, sync::Arc};
+use std::{collections::BTreeMap, ops::Range, sync::Arc};
 
 use askama::Template;
 use axum::{
@@ -12,7 +12,7 @@ use eyre::{Context, Result};
 use http::StatusCode;
 use sqlx::{Pool, Sqlite};
 
-use crate::{client::CheckState, db::Check};
+use crate::{client::CheckState, db::CheckSeries};
 
 trait RenderDate {
     fn render_nicely(&self) -> String;
@@ -47,30 +47,33 @@ async fn root(State(db): State<Arc<Pool<Sqlite>>>) -> Response {
 }
 
 pub async fn render_root(db: Arc<Pool<Sqlite>>) -> Result<String> {
-    let checks = crate::db::get_checks(&db).await?;
+    let checks = crate::db::get_checks_series(&db).await?;
 
     let status = compute_status(checks);
 
-    let html = RootTemplate { status, version: crate::VERSION }
-        .render()
-        .wrap_err("error rendering template")?;
+    let html = RootTemplate {
+        status,
+        version: crate::VERSION,
+    }
+    .render()
+    .wrap_err("error rendering template")?;
     Ok(html)
 }
 
-fn compute_status(checks: Vec<Check>) -> Vec<WebsiteStatus> {
+fn compute_status(checks: Vec<CheckSeries>) -> Vec<WebsiteStatus> {
     let mut websites = BTreeMap::new();
 
     checks.into_iter().for_each(|check| {
-        websites
-            .entry(check.website)
-            .or_insert(Vec::new())
-            .push((check.request_time, check.result));
+        websites.entry(check.website).or_insert(Vec::new()).push((
+            check.request_time_range_start..check.request_time_range_end,
+            check.result,
+        ));
     });
 
     websites
         .into_iter()
         .map(|(website, mut checks)| {
-            checks.sort_by_key(|check| check.0);
+            checks.sort_by_key(|check| check.0.start);
 
             let mut last_ok = None;
             let mut count_ok = 0;
@@ -81,7 +84,7 @@ fn compute_status(checks: Vec<Check>) -> Vec<WebsiteStatus> {
             let len = checks.len();
             checks.into_iter().for_each(|(time, result)| {
                 if let CheckState::Ok = result {
-                    last_ok = std::cmp::max(last_ok, Some(time));
+                    last_ok = std::cmp::max(last_ok, Some(time.end));
                     count_ok += 1;
                 }
             });
@@ -132,40 +135,51 @@ struct BarInfo {
 /// frontend, in a fixed sensical timeline.
 /// We slice the time from the first check to the last check (maybe something like last check-30d
 /// in the future) into slices and aggregate all checks from these times into these slices.
-fn checks_to_classes(checks: &[(DateTime<Utc>, CheckState)], classes: usize) -> BarInfo {
+fn checks_to_classes(
+    checks_series: &[(Range<DateTime<Utc>>, CheckState)],
+    classes: usize,
+) -> BarInfo {
     assert_ne!(classes, 0);
-    let Some(first) = checks.first() else {
+    let Some(first) = checks_series.first() else {
         return BarInfo {
             elems: Vec::new(),
             first_time: None,
             last_time: None,
         };
     };
-    let last = checks.last().unwrap();
+    let last = checks_series.last().unwrap();
 
     let mut bins = vec![vec![]; classes];
 
-    let first_m = first.0.timestamp_millis();
-    let last_m = last.0.timestamp_millis();
+    let first_event = first.0.start.timestamp_millis() as f64; // welcome to float land, where we float
+    let last_event = last.0.end.timestamp_millis() as f64;
 
-    let last_rel = last_m - first_m;
-    assert!(last_m.is_positive(), "checks not ordered correctly");
+    let event_time_range = last_event - first_event;
+    assert!(
+        event_time_range.is_sign_positive(),
+        "checks not ordered correctly"
+    );
 
-    for check in checks {
-        let time_rel = check.0.timestamp_millis() - first_m;
-        assert!(first_m.is_positive(), "checks not ordered correctly");
+    let bin_diff = event_time_range / (classes as f64);
 
-        /*
-        5 bins:
-        |   |   |   |   |   |
-        0.0 0.2 0.4 0.6 0.8 1.0  division
-        0.0 1.0 2.0 3.0 4.0 5.0  after multiply
-        */
+    let bin_ranges = (0..classes).map(|i| {
+        // we DO NOT want to miss the last event due to imprecision, so widen the range for the last event
+        let end_factor_range = if i == (classes - 1) { 2.0 } else { 1.0 };
+        let i = i as f64;
+        (i * bin_diff)..((i + end_factor_range) * bin_diff)
+    });
 
-        let bin = (time_rel as f64) / (last_rel as f64) * ((classes) as f64);
-        let bin = bin as usize; // flooring on purpose
-        let bin = if bin == classes { bin - 1 } else { bin };
-        bins[bin].push(check);
+    for series in checks_series {
+        for (i, bin_range) in bin_ranges.clone().enumerate() {
+            let start = (series.0.start.timestamp_millis() as f64) - first_event;
+            let end = (series.0.end.timestamp_millis() as f64) - first_event;
+            assert!(start.is_sign_positive(), "checks not ordered correctly");
+            assert!(end.is_sign_positive(), "checks not ordered correctly");
+
+            if !range_disjoint(bin_range, start..end) {
+                bins[i].push(series);
+            }
+        }
     }
 
     let elems = bins
@@ -193,9 +207,13 @@ fn checks_to_classes(checks: &[(DateTime<Utc>, CheckState)], classes: usize) -> 
 
     BarInfo {
         elems,
-        first_time: Some(first.0),
-        last_time: Some(last.0),
+        first_time: Some(first.0.start),
+        last_time: Some(last.0.end),
     }
+}
+
+fn range_disjoint<T: PartialOrd>(a: Range<T>, b: Range<T>) -> bool {
+    (a.end < b.start) || (a.start > b.end)
 }
 
 #[derive(Debug)]

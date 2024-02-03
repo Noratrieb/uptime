@@ -18,7 +18,7 @@ pub struct CheckResult {
     pub state: CheckState,
 }
 
-#[derive(Debug, PartialEq, sqlx::Type)]
+#[derive(Debug, PartialEq, Clone, sqlx::Type)]
 #[sqlx(rename_all = "snake_case")]
 pub enum CheckState {
     Ok,
@@ -40,7 +40,7 @@ async fn make_request(client: &reqwest::Client, website: &WebsiteConfig) -> Chec
     let time = Utc::now();
     let result = client.get(website.url.clone()).send().await;
 
-    info!(?result, ?website.url, "Made health request");
+    info!(?result, %website.url, "Made health request");
 
     match result {
         Ok(res) => CheckResult {

@@ -71,10 +71,13 @@ pub async fn check_timer(config: Config, db: Arc<Pool<Sqlite>>) -> Result<ⵑ> {
 
         let results = client::do_checks(&client).await;
 
-        if let Err(err) = db::insert_results(&db, results).await {
+        if let Err(err) = db::insert_results(&db, &results).await {
             error!(?err);
         }
 
+        if let Err(err) = db::insert_results_series(&db, config.interval_seconds, &results).await {
+            error!(?err);
+        }
         info!("Finished tick.");
     }
 }

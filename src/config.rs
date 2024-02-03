@@ -13,10 +13,19 @@ fn default_db_url() -> String {
     "uptime.db".into()
 }
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(serde::Deserialize)]
 pub struct WebsiteConfig {
     pub name: String,
     pub url: Url,
+}
+
+impl std::fmt::Debug for WebsiteConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("WebsiteConfig")
+            .field("name", &self.name)
+            .field("url", &format_args!("{}", self.url))
+            .finish()
+    }
 }
 
 pub fn read_config(config_path: &str) -> Result<Config> {

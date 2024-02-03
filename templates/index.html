@@ -68,8 +68,7 @@
 
       <h2>{{ check.website }}</h2>
       <p>
-        Uptime: {{ check.ok_ratio }} ({{ check.count_ok }}/{{
-        check.total_requests }})
+        Uptime: {{ check.ok_ratio }}
       </p>
       {% if check.last_ok.is_some() %}
       <p>

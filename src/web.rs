@@ -81,15 +81,22 @@ fn compute_status(checks: Vec<CheckSeries>) -> Vec<WebsiteStatus> {
             const BAR_ELEMS: usize = 100;
             let bar_info = checks_to_classes(&checks, BAR_ELEMS);
 
-            let len = checks.len();
+            let total_duration_millis = checks
+                .first()
+                .map(|first| {
+                    checks.last().unwrap().0.end.timestamp_millis()
+                        - first.0.start.timestamp_millis()
+                })
+                .unwrap_or_default();
+
             checks.into_iter().for_each(|(time, result)| {
                 if let CheckState::Ok = result {
                     last_ok = std::cmp::max(last_ok, Some(time.end));
-                    count_ok += 1;
+                    count_ok += time.end.timestamp_millis() - time.start.timestamp_millis();
                 }
             });
 
-            let ok_ratio = (count_ok as f32) / (len as f32);
+            let ok_ratio = (count_ok as f32) / (total_duration_millis as f32);
             let ok_ratio = format!("{:.2}%", ok_ratio * 100.0);
 
             let last_ok = last_ok.map(|utc| utc.render_nicely());
@@ -97,8 +104,6 @@ fn compute_status(checks: Vec<CheckSeries>) -> Vec<WebsiteStatus> {
                 website,
                 last_ok,
                 ok_ratio,
-                count_ok,
-                total_requests: len,
                 bar_info,
             }
         })
@@ -221,8 +226,6 @@ struct WebsiteStatus {
     website: String,
     last_ok: Option<String>,
     ok_ratio: String,
-    total_requests: usize,
-    count_ok: usize,
     bar_info: BarInfo,
 }
 

@@ -197,25 +197,30 @@ pub async fn migrate_checks(db: &Pool<Sqlite>, interval_seconds: u64) -> Result<
     }
 
     info!("Inserting checks");
-    let mut db = db.begin().await.wrap_err("starting transaction")?;
+    let mut db_trans = db.begin().await.wrap_err("starting transaction")?;
     for check in table.iter() {
         sqlx::query("INSERT INTO checks_series (request_time_range_start, request_time_range_end, website, result) VALUES (?, ?, ?, ?);")
         .bind(check.request_time_range_start)
         .bind(check.request_time_range_end)
         .bind(&check.website)
         .bind(&check.result)
-        .execute(&mut *db)
+        .execute(&mut *db_trans)
         .await
         .wrap_err_with(|| format!("inserting new series record for {}", check.website))?;
     }
     info!("Dropping old table");
 
     sqlx::query("DROP TABLE checks")
-        .execute(&mut *db)
+        .execute(&mut *db_trans)
         .await
         .wrap_err("dropping table checks")?;
 
-    db.commit().await.wrap_err("committing transaction")?;
+    db_trans.commit().await.wrap_err("committing transaction")?;
+
+    sqlx::query("VACUUM")
+        .execute(db)
+        .await
+        .wrap_err("running vacuum")?;
 
     Ok(())
 }

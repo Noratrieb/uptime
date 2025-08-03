@@ -1,5 +1,7 @@
 # uptime
 
+⚠️ uptime.noratrieb.dev has been retired ⚠️
+
 custom uptime monitoring tool.
 
 ## config
